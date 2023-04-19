@@ -22,6 +22,8 @@ REASON_ICONS = {
     "content_filter": "✋",
     "null": "❓"}
 
+INPUT_PLACEHOLDER = "{input}"
+
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 st.set_page_config(layout="wide")
@@ -47,16 +49,22 @@ def send_message(role, text, top_p, max_tokens):
     # Delete messages which delete_flag is True
     st.session_state.messages = list(filter(lambda x: not x["delete_flag"], st.session_state.messages))
 
-    new_msg = {"role": role, "content": text.strip(), "delete_flag": False}
+    if role == "user" and INPUT_PLACEHOLDER in st.session_state.template:
+        text_for_api = st.session_state.template.replace(INPUT_PLACEHOLDER, text)
+        print("User message after formatting:")
+        print(text_for_api)
+    else:
+        text_for_api = text
 
     # Each message sent to ChatGPT should contain only the keys ChatGPT accepts ("role" and "content")
     msgs = list(map(lambda x: {"role": x["role"], "content": x["content"]},
-                    [*st.session_state.messages, new_msg]))
+                    [*st.session_state.messages, {"role": role, "content": text_for_api}]))
 
     # Kick API and receive a response from ChatGPT
     res, reason, usage = chatgpt(msgs, top_p, max_tokens)
 
     # Update the history
+    new_msg = {"role": role, "content": text.strip(), "delete_flag": False}
     st.session_state.messages.append(new_msg)
     st.session_state.messages.append({**res, "finish_reason": reason, "delete_flag": False})
     return usage
@@ -73,10 +81,17 @@ if "last_usage" not in st.session_state:
         "total_tokens": 0}
 if "basename" not in st.session_state:
     # Basename used to save messages
-    st.session_state["basename"] = ""
+    st.session_state.basename = ""
+if "template" not in st.session_state:
+    st.session_state.template = INPUT_PLACEHOLDER
 
 st.write("⚠️Always monitor your [API usage](https://platform.openai.com/account/usage) carefully. "
          "It's highly recommended to [setup usage limits](https://platform.openai.com/account/billing/limits)!")
+
+# Template
+with st.expander("Template"):
+    # Template
+    input_template = st.text_area("Template", "", key="template", label_visibility="collapsed")
 
 # Prompt
 input_text = st.text_area("Prompt", "")
