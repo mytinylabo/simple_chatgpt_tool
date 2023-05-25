@@ -349,10 +349,12 @@ with tab_history:
             col_cont_pn.empty()
             if msg["delete_flag"]:
                 # Show the text as deleted
+                role = f"{role} {DELETED_ICON}"
                 col_role_ph.write(deleted(role))
                 col_cont_pn.write(deleted(content))
             else:
                 # Show the text as it is
+                role = role.replace(f" {DELETED_ICON}", "")
                 col_role_ph.write(role)
                 col_cont_pn.write(content)
 
