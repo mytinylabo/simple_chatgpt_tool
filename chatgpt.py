@@ -31,6 +31,7 @@ INPUT_PLACEHOLDER = "{input}"
 DEFAULT_PROMPT_TO_SUMMARIZE = """
 ここまでの内容の要約を箇条書きで作成してください。
 - 箇条書き以外の前置き、結論は不要です
+- 時系列に沿って要約してください
 - 項目数は最大でも10個程度にしてください
 """
 
@@ -78,6 +79,8 @@ def send_message(role, text, top_p, max_tokens):
 
     insert_current_summary(msgs, st.session_state.n_before_summary)
 
+    st.session_state.last_request = msgs
+
     # Kick API and receive a response from ChatGPT
     res, reason, usage = chatgpt(msgs, top_p, max_tokens)
 
@@ -96,10 +99,12 @@ def summerize():
     # Each message sent to ChatGPT should contain only the keys ChatGPT accepts ("role" and "content")
     msgs = [m for m in st.session_state.messages if not m["summarized"]]
     msgs = list(map(lambda x: {"role": x["role"], "content": x["content"]},
-                    [*st.session_state.messages[:-st.session_state.n_to_keep],
+                    [*msgs[:-st.session_state.n_to_keep],
                     {"role": "system", "content": st.session_state.prompt_to_summerize}]))
 
     insert_current_summary(msgs, st.session_state.n_before_summary)
+
+    st.session_state.last_summary_request = msgs
 
     # Kick API and receive a response from ChatGPT
     res, reason, usage = chatgpt(msgs, top_p, MAX_SUMMARY_TOKENS)
@@ -145,6 +150,10 @@ if "n_before_summary" not in st.session_state:
     st.session_state.n_before_summary = 1
 if "enable_auto_summarize" not in st.session_state:
     st.session_state.enable_auto_summarize = True
+if "last_request" not in st.session_state:
+    st.session_state.last_request = {}
+if "last_summary_request" not in st.session_state:
+    st.session_state.last_summary_request = {}
 
 st.write("⚠️Always monitor your [API usage](https://platform.openai.com/account/usage) carefully. "
          "It's highly recommended to [setup usage limits](https://platform.openai.com/account/billing/limits)!")
@@ -258,9 +267,9 @@ if action_cols[6].button("Load"):
     st.session_state.summary = summary
     st.session_state.template = template
 
-template_ph.text_area("Template", "", key="template", label_visibility="collapsed")
+template_ph.text_area("Template", key="template", label_visibility="collapsed")
 
-tab_history, tab_summary = st.tabs(["History", "Summary"])
+tab_history, tab_summary, tab_last_req = st.tabs(["History", "Summary", "Last request"])
 
 with tab_history:
     # Display token usage
@@ -350,7 +359,7 @@ with tab_history:
 with tab_summary:
     with st.expander("Prompt to summerize"):
         # Template
-        st.text_area("Prompt to summerize", "",
+        st.text_area("Prompt to summerize",
                      key="prompt_to_summerize", label_visibility="collapsed")
 
     summary_cols = st.columns([1, 1.5, 1.5, 1.5, 4.5])
@@ -367,3 +376,9 @@ with tab_summary:
                                  min_value=0, max_value=10, key="n_before_summary")
 
     st.text_area("Summary", "", key="summary")
+
+with tab_last_req:
+    with st.expander("Main chat"):
+        st.json(st.session_state.last_request)
+    with st.expander("Summary"):
+        st.json(st.session_state.last_summary_request)
