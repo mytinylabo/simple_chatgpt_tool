@@ -404,20 +404,15 @@ with tab_history:
         role = msg["role"]
         icons = []
         if "finish_reason" in msg:
-            # icon = REASON_ICONS.get(msg["finish_reason"], "[?]")
-            # role = f"{role} {icon}"
             icons.append(REASON_ICONS.get(msg["finish_reason"], "[?]"))
         if msg["summarized"]:
-            # role = f"{role} {SUMMARIZED_ICON}"
             icons.append(SUMMARIZED_ICON)
         if msg["delete_flag"]:
-            # role = f"{role} {DELETED_ICON}"
             icons.append(DELETED_ICON)
         content = msg["content"]
 
         col_role, col_cont, col_act = st.columns([1, 6, 1])
 
-        # col_role_ph = col_role.empty()
         col_cont_pn = col_cont.empty()
 
         st.markdown("---")
@@ -432,7 +427,7 @@ with tab_history:
             col_act.button("📝", key=f"edit_{i}")
 
         else:
-            # col_role_ph.write(role)  # Show the role as it is
+            # Show the role as a dropdown
             roles = ["user", "system", "assistant"]
             role_i = roles.index(role)
             key_role = f"role_{i}"
@@ -440,18 +435,11 @@ with tab_history:
                                on_change=get_updater(i, "role", key_role),
                                label_visibility="collapsed")
             col_role.write(" ".join(icons))
-            # print(x, role, roles, key_role, role_i)
 
             if col_act.button("📝", key=f"edit_{i}"):
                 # Switch to text area when Edit button is clicked
                 if not msg["delete_flag"]:
                     key_cont = f"txt_cont_{i}"
-
-                    # def get_updater(j, k):
-                    #     # Make a handler as a closure to avoid because i, key will be overwritten
-                    #     def update_messages():
-                    #         st_state.messages[j]["content"] = st_state[k]
-                    #     return update_messages
 
                     col_cont_pn.text_area("Content", content, key=key_cont,
                                           on_change=get_updater(i, "content", key_cont),
@@ -464,26 +452,9 @@ with tab_history:
         key_del = f"del_{i}"
         col_act.button("🗑️", key=key_del,
                        on_click=get_updater(i, "delete_flag", key_del, not msg["delete_flag"]))
-        # if col_act.button("🗑️", key=f"del_{i}"):
-        #     # Switch the delete flag
-        #     msg["delete_flag"] = not msg["delete_flag"]
-        #     col_role_ph.empty()
-        #     col_cont_pn.empty()
-        #     if msg["delete_flag"]:
-        #         # Show the text as deleted
-        #         role = f"{role} {DELETED_ICON}"
-        #         col_role_ph.write(deleted(role))
-        #         col_cont_pn.write(deleted(content))
-        #     else:
-        #         # Show the text as it is
-        #         role = role.replace(f" {DELETED_ICON}", "")
-        #         col_role_ph.write(role)
-        #         col_cont_pn.write(content)
 
         key_sum = f"summarized_{i}"
         col_act.checkbox("📘", msg["summarized"], key=key_sum, on_change=get_updater(i, "summarized", key_sum))
-        # summarized = col_act.checkbox("📘", msg["summarized"], key=f"summarized_{i}")
-        # msg["summarized"] = summarized
 
 with tab_summary:
     with st.expander("Prompt to summerize"):
