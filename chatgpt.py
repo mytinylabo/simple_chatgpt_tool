@@ -47,7 +47,6 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 
 st.set_page_config(layout="wide")
 
-
 SESSION_STATE = {
     "top_p": 0.4,
     "frequency_penalty": 1.0,
@@ -191,28 +190,28 @@ def save_messages(path_without_ext):
                      "presence_penalty": st_state.presence_penalty}, p)
     # Export as a markdown file
     msgs = [m for m in st_state.messages if not m["delete_flag"]]
-    md = "\n\n---\n\n".join(map(lambda x: f"**{x['role']}**\n\n{x['content']}",
-                                msgs))
+    md = "\n\n---\n\n".join(map(lambda x: f"**{x['role']}**\n\n{x['content']}", msgs))
     Path(f"{path_without_ext}.md").write_text(md + "\n")
 
 
 with st.sidebar:
     st.title("API SETTING")
     with st.expander("API key"):
-        api_key = os.getenv(API_KEY_ENV_NAME) or ""
-        st.text_input("API key", api_key, key="api_key", label_visibility="collapsed")
-    st.selectbox("Model", MODELS, index=MODELS.index(DEFAULT_MODEL), key="chatgpt_model")
-    st.slider("top_p", 0.0, 1.0, step=0.1, key="top_p")
-    st.slider("frequency_penalty", -2.0, 2.0, step=0.1, key="frequency_penalty")
-    st.slider("presence_penalty", -2.0, 2.0, step=0.1, key="presence_penalty")
+        env_api_key = os.getenv(API_KEY_ENV_NAME) or ""
+        ui_api_key = st.text_input("API key", env_api_key, key="api_key", label_visibility="collapsed")
 
-    st.selectbox("max_tokens",
-                 (128, 256, 512, 1024, 2048),
-                 index=2, key="max_tokens")
+    ui_model = st.selectbox("Model", MODELS, index=MODELS.index(DEFAULT_MODEL), key="chatgpt_model")
+    ui_top_p = st.slider("top_p", 0.0, 1.0, step=0.1, key="top_p")
+    ui_f_penal = st.slider("frequency_penalty", -2.0, 2.0, step=0.1, key="frequency_penalty")
+    ui_p_penal = st.slider("presence_penalty", -2.0, 2.0, step=0.1, key="presence_penalty")
+
+    ui_max_tokens = st.selectbox("max_tokens",
+                                 (128, 256, 512, 1024, 2048),
+                                 index=2, key="max_tokens")
 
     st.title("SAVE/LOAD")
     # File basename (without extension) to save/load
-    st.text_input("Basename", key="basename")
+    ui_basename = st.text_input("Basename", key="basename")
 
     def on_click_save():
         if st_state.basename.strip() == "":
@@ -224,7 +223,7 @@ with st.sidebar:
 
     def on_click_load():
         # If basename is empty, use the auto backup file
-        path = BACKUP_NAME + str(st_state.auto_save_slot) if st_state.basename.strip() == "" else f"{SAVE_DIR}/{st_state.basename}"
+        path = BACKUP_NAME + str(st_state.autosave_slot) if st_state.basename.strip() == "" else f"{SAVE_DIR}/{st_state.basename}"
 
         with open(f"{path}.pickle", 'rb') as p:
             data = pickle.load(p)
@@ -269,22 +268,36 @@ with st.sidebar:
     col_save.button("Save", on_click=on_click_save, use_container_width=True)
     col_load.button("Load", on_click=on_click_load, use_container_width=True)
 
-    st.slider("Auto save slot", 0, 9, 0, 1, key="auto_save_slot")
+    ui_autosave_slot = st.slider("Auto save slot", 0, 9, 0, 1, key="autosave_slot")
 
     st.title("SUMMARY SETTING")
-    st.checkbox("Enable auto summarize", key="enable_auto_summarize")
+    ui_enable_summary = st.checkbox("Enable auto summarize", key="enable_auto_summarize")
 
-    st.number_input("N of tokens to summerize",
-                    min_value=1024,
-                    max_value=MODEL_MAX_TOKENS[st_state.chatgpt_model] - MAX_SUMMARY_TOKENS,
-                    key="n_to_summerize")
+    ui_n_to_summerize = st.number_input("N of tokens to summerize",
+                                        min_value=1024,
+                                        max_value=MODEL_MAX_TOKENS[st_state.chatgpt_model] - MAX_SUMMARY_TOKENS,
+                                        key="n_to_summerize")
 
-    st.number_input("N of recent messages to keep",
-                    min_value=2, max_value=60, key="n_to_keep")
+    ui_n_to_keep = st.number_input("N of recent messages to keep",
+                                   min_value=2, max_value=60, key="n_to_keep")
 
-    st.number_input("N of first messages before summary",
-                    min_value=0, max_value=10, key="n_before_summary")
+    ui_n_before_summary = st.number_input("N of first messages before summary",
+                                          min_value=0, key="n_before_summary")
 
+    # TODO: Use this dictionary to reject references to globals from utility methods
+    ui_params = {
+        "api_key": ui_api_key,
+        "model": ui_model,
+        "top_p": ui_top_p,
+        "frequency_penalty": ui_f_penal,
+        "presence_penalty": ui_p_penal,
+        "max_tokens": ui_max_tokens,
+        "basename": ui_basename,
+        "autosave_slot": ui_autosave_slot,
+        "enable_auto_summarize": ui_enable_summary,
+        "n_to_summerize": ui_n_to_summerize,
+        "n_to_keep": ui_n_to_keep,
+        "n_before_summary": ui_n_before_summary}
 
 st.write("⚠️Always monitor your [API usage](https://platform.openai.com/account/usage) carefully. "
          "It's highly recommended to [setup usage limits](https://platform.openai.com/account/billing/limits)!")
@@ -332,7 +345,7 @@ try:
                 "presence_penalty": st_state.presence_penalty,
                 "max_tokens": st_state.max_tokens}
             st_state.last_usage = send_message(role, input_text, api_param)
-        save_messages(BACKUP_NAME + str(st_state.auto_save_slot))  # Automatically backup
+        save_messages(BACKUP_NAME + str(st_state.autosave_slot))  # Automatically backup
 
 except openai.InvalidRequestError as e:
     system_msg_ph.error(e)
@@ -352,9 +365,32 @@ with tab_history:
     metric_cols[1].metric("Prompt", n_prompt)
     metric_cols[2].metric("Total (~4097)", n_total)
 
+    if st.button("Add message"):
+        if len(st_state.messages) > 0:
+            role = "user" if st_state.messages[-1]["role"] == "assistant" else "assistant"
+        else:
+            role = "system"
+
+        st_state.messages.append({
+            "role": role,
+            "content": "EDIT ME",
+            "delete_flag": False,
+            "summarized": False})
+
+        st.experimental_rerun()
+
     # Message history
     fields = ["role", "content", "actions"]
     list_cols = st.columns([1, 6, 1])
+
+    def get_updater(index, state_key, ui_key, direct_value=None):
+        def updater():
+            if direct_value is not None:
+                st_state.messages[index][state_key] = direct_value
+            else:
+                st_state.messages[index][state_key] = st_state[ui_key]
+
+        return updater
 
     def deleted(txt):
         # Mark the text as deleted
@@ -366,67 +402,88 @@ with tab_history:
 
     for i, msg in reversed(list(enumerate(st_state.messages))):
         role = msg["role"]
+        icons = []
         if "finish_reason" in msg:
-            icon = REASON_ICONS.get(msg["finish_reason"], "[?]")
-            role = f"{role} {icon}"
+            # icon = REASON_ICONS.get(msg["finish_reason"], "[?]")
+            # role = f"{role} {icon}"
+            icons.append(REASON_ICONS.get(msg["finish_reason"], "[?]"))
         if msg["summarized"]:
-            role = f"{role} {SUMMARIZED_ICON}"
+            # role = f"{role} {SUMMARIZED_ICON}"
+            icons.append(SUMMARIZED_ICON)
         if msg["delete_flag"]:
-            role = f"{role} {DELETED_ICON}"
+            # role = f"{role} {DELETED_ICON}"
+            icons.append(DELETED_ICON)
         content = msg["content"]
 
         col_role, col_cont, col_act = st.columns([1, 6, 1])
 
-        col_role_ph = col_role.empty()
+        # col_role_ph = col_role.empty()
         col_cont_pn = col_cont.empty()
 
         st.markdown("---")
 
         if msg["delete_flag"]:
             # Show the text as deleted
-            col_role_ph.write(deleted(role))
+            col_role.write(role)
+            col_role.write(" ".join(icons))
             col_cont_pn.write(deleted(content))
 
             # Just show Edit button. It doesn't do anything
-            col_act.button("Edit", key=f"edit_{i}")
+            col_act.button("📝", key=f"edit_{i}")
 
         else:
-            col_role_ph.write(role)  # Show the role as it is
+            # col_role_ph.write(role)  # Show the role as it is
+            roles = ["user", "system", "assistant"]
+            role_i = roles.index(role)
+            key_role = f"role_{i}"
+            col_role.selectbox("Role", roles, index=role_i, key=key_role,
+                               on_change=get_updater(i, "role", key_role),
+                               label_visibility="collapsed")
+            col_role.write(" ".join(icons))
+            # print(x, role, roles, key_role, role_i)
 
-            if col_act.button("Edit", key=f"edit_{i}"):
+            if col_act.button("📝", key=f"edit_{i}"):
                 # Switch to text area when Edit button is clicked
                 if not msg["delete_flag"]:
-                    key = f"txt_cont_{i}"
+                    key_cont = f"txt_cont_{i}"
 
-                    def get_updater(j, k):
-                        # Make a handler as a closure to avoid because i, key will be overwritten
-                        def update_messages():
-                            st_state.messages[j]["content"] = st_state[k]
-                        return update_messages
+                    # def get_updater(j, k):
+                    #     # Make a handler as a closure to avoid because i, key will be overwritten
+                    #     def update_messages():
+                    #         st_state.messages[j]["content"] = st_state[k]
+                    #     return update_messages
 
-                    col_cont_pn.text_area("Content", content, key=key,
-                                          on_change=get_updater(i, key),
+                    col_cont_pn.text_area("Content", content, key=key_cont,
+                                          on_change=get_updater(i, "content", key_cont),
                                           label_visibility="collapsed")
 
             else:
                 # Show the content as it is
                 col_cont_pn.write(content)
 
-        if col_act.button("Del", key=f"del_{i}"):
-            # Switch the delete flag
-            msg["delete_flag"] = not msg["delete_flag"]
-            col_role_ph.empty()
-            col_cont_pn.empty()
-            if msg["delete_flag"]:
-                # Show the text as deleted
-                role = f"{role} {DELETED_ICON}"
-                col_role_ph.write(deleted(role))
-                col_cont_pn.write(deleted(content))
-            else:
-                # Show the text as it is
-                role = role.replace(f" {DELETED_ICON}", "")
-                col_role_ph.write(role)
-                col_cont_pn.write(content)
+        key_del = f"del_{i}"
+        col_act.button("🗑️", key=key_del,
+                       on_click=get_updater(i, "delete_flag", key_del, not msg["delete_flag"]))
+        # if col_act.button("🗑️", key=f"del_{i}"):
+        #     # Switch the delete flag
+        #     msg["delete_flag"] = not msg["delete_flag"]
+        #     col_role_ph.empty()
+        #     col_cont_pn.empty()
+        #     if msg["delete_flag"]:
+        #         # Show the text as deleted
+        #         role = f"{role} {DELETED_ICON}"
+        #         col_role_ph.write(deleted(role))
+        #         col_cont_pn.write(deleted(content))
+        #     else:
+        #         # Show the text as it is
+        #         role = role.replace(f" {DELETED_ICON}", "")
+        #         col_role_ph.write(role)
+        #         col_cont_pn.write(content)
+
+        key_sum = f"summarized_{i}"
+        col_act.checkbox("📘", msg["summarized"], key=key_sum, on_change=get_updater(i, "summarized", key_sum))
+        # summarized = col_act.checkbox("📘", msg["summarized"], key=f"summarized_{i}")
+        # msg["summarized"] = summarized
 
 with tab_summary:
     with st.expander("Prompt to summerize"):
